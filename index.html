@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Airport Runway Control</title>
+
+    <!-- MQTT.js -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #020617,
+                    #0f172a,
+                    #1e293b
+                );
+
+            min-height: 100vh;
+
+            color: white;
+
+        }
+
+        /* HEADER */
+
+        header {
+
+            background: rgba(15, 23, 42, 0.95);
+
+            padding: 25px;
+
+            text-align: center;
+
+            border-bottom: 2px solid #334155;
+
+        }
+
+        header h1 {
+
+            font-size: 32px;
+
+            margin-bottom: 8px;
+
+        }
+
+        header p {
+
+            color: #94a3b8;
+
+        }
+
+        /* MAIN */
+
+        .container {
+
+            width: 92%;
+
+            max-width: 1200px;
+
+            margin: 30px auto;
+
+        }
+
+        /* CONNECTION */
+
+        .connection {
+
+            background: #111827;
+
+            border: 1px solid #334155;
+
+            border-radius: 15px;
+
+            padding: 18px;
+
+            margin-bottom: 25px;
+
+            text-align: center;
+
+        }
+
+        .status-online {
+
+            color: #22c55e;
+
+            font-weight: bold;
+
+        }
+
+        .status-offline {
+
+            color: #ef4444;
+
+            font-weight: bold;
+
+        }
+
+        /* AIRPORT */
+
+        .airport {
+
+            background: #111827;
+
+            border: 1px solid #334155;
+
+            border-radius: 20px;
+
+            padding: 30px;
+
+            margin-bottom: 25px;
+
+        }
+
+        .airport h2 {
+
+            text-align: center;
+
+            margin-bottom: 25px;
+
+        }
+
+        /* RUNWAY VISUAL */
+
+        .runway {
+
+            background: #1e293b;
+
+            border: 3px solid #64748b;
+
+            border-radius: 15px;
+
+            height: 250px;
+
+            position: relative;
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: space-around;
+
+            align-items: center;
+
+            overflow: hidden;
+
+        }
+
+        .runway-center {
+
+            position: absolute;
+
+            width: 90%;
+
+            height: 4px;
+
+            border-top: 4px dashed #f8fafc;
+
+            top: 50%;
+
+        }
+
+        .runway-lights {
+
+            display: flex;
+
+            width: 85%;
+
+            justify-content: space-between;
+
+            position: relative;
+
+            z-index: 2;
+
+        }
+
+        .runway-light {
+
+            width: 22px;
+
+            height: 22px;
+
+            border-radius: 50%;
+
+            background: #334155;
+
+            border: 2px solid #64748b;
+
+        }
+
+        .runway-light.on {
+
+            background: #ffffff;
+
+            box-shadow:
+
+                0 0 10px #ffffff,
+
+                0 0 25px #ffffff;
+
+        }
+
+        /* CONTROL GRID */
+
+        .grid {
+
+            display: grid;
+
+            grid-template-columns:
+
+                repeat(auto-fit, minmax(250px, 1fr));
+
+            gap: 20px;
+
+        }
+
+        .card {
+
+            background: #111827;
+
+            border: 1px solid #334155;
+
+            border-radius: 18px;
+
+            padding: 25px;
+
+            text-align: center;
+
+        }
+
+        .card h3 {
+
+            margin-bottom: 15px;
+
+        }
+
+        .device-status {
+
+            margin-bottom: 18px;
+
+            padding: 10px;
+
+            border-radius: 8px;
+
+            background: #1e293b;
+
+            color: #94a3b8;
+
+        }
+
+        .device-status.active {
+
+            background: #064e3b;
+
+            color: #4ade80;
+
+        }
+
+        .device-status.danger {
+
+            background: #7f1d1d;
+
+            color: #fca5a5;
+
+        }
+
+        /* BUTTON */
+
+        button {
+
+            border: none;
+
+            padding: 12px 20px;
+
+            margin: 5px;
+
+            border-radius: 10px;
+
+            cursor: pointer;
+
+            font-size: 15px;
+
+            font-weight: bold;
+
+            transition: 0.2s;
+
+        }
+
+        button:hover {
+
+            transform: scale(1.05);
+
+        }
+
+        .btn-on {
+
+            background: #16a34a;
+
+            color: white;
+
+        }
+
+        .btn-off {
+
+            background: #dc2626;
+
+            color: white;
+
+        }
+
+        .btn-all {
+
+            background: #2563eb;
+
+            color: white;
+
+        }
+
+        .btn-emergency {
+
+            background: #b91c1c;
+
+            color: white;
+
+            width: 90%;
+
+            font-size: 18px;
+
+        }
+
+        /* EMERGENCY */
+
+        .emergency {
+
+            margin-top: 20px;
+
+            background: #111827;
+
+            border: 2px solid #7f1d1d;
+
+            border-radius: 18px;
+
+            padding: 25px;
+
+            text-align: center;
+
+        }
+
+        .emergency h2 {
+
+            color: #f87171;
+
+            margin-bottom: 15px;
+
+        }
+
+        /* FOOTER */
+
+        footer {
+
+            text-align: center;
+
+            color: #64748b;
+
+            padding: 30px;
+
+        }
+
+        @media(max-width:600px) {
+
+            header h1 {
+
+                font-size: 24px;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <h1>✈️ AIRPORT RUNWAY CONTROL</h1>
+
+    <p>ESP32 • MQTT • WOKWI</p>
+
+</header>
+
+
+<div class="container">
+
+
+    <!-- CONNECTION -->
+
+    <div class="connection">
+
+        MQTT STATUS:
+
+        <span id="connectionStatus"
+              class="status-offline">
+
+            MENGHUBUNGKAN...
+
+        </span>
+
+    </div>
+
+
+    <!-- AIRPORT VISUAL -->
+
+    <div class="airport">
+
+        <h2>🛫 RUNWAY VISUALIZATION</h2>
+
+        <div class="runway">
+
+            <div class="runway-center"></div>
+
+            <div class="runway-lights">
+
+                <div id="visual1"
+                     class="runway-light"></div>
+
+                <div id="visual2"
+                     class="runway-light"></div>
+
+                <div id="visual3"
+                     class="runway-light"></div>
+
+                <div id="visual4"
+                     class="runway-light"></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- CONTROL -->
+
+    <div class="grid">
+
+
+        <!-- RUNWAY -->
+
+        <div class="card">
+
+            <h3>💡 RUNWAY LIGHT</h3>
+
+            <div id="runwayStatus"
+                 class="device-status">
+
+                OFF
+
+            </div>
+
+            <button
+                class="btn-on"
+                onclick="sendCommand('RUNWAY_ON')">
+
+                ON
+
+            </button>
+
+            <button
+                class="btn-off"
+                onclick="sendCommand('RUNWAY_OFF')">
+
+                OFF
+
+            </button>
+
+        </div>
+
+
+        <!-- APPROACH -->
+
+        <div class="card">
+
+            <h3>🔵 APPROACH LIGHT</h3>
+
+            <div id="approachStatus"
+                 class="device-status">
+
+                OFF
+
+            </div>
+
+            <button
+                class="btn-on"
+                onclick="sendCommand('APPROACH_ON')">
+
+                ON
+
+            </button>
+
+            <button
+                class="btn-off"
+                onclick="sendCommand('APPROACH_OFF')">
+
+                OFF
+
+            </button>
+
+        </div>
+
+
+        <!-- BEACON -->
+
+        <div class="card">
+
+            <h3>🔴 AIRPORT BEACON</h3>
+
+            <div id="beaconStatus"
+                 class="device-status">
+
+                OFF
+
+            </div>
+
+            <button
+                class="btn-on"
+                onclick="sendCommand('BEACON_ON')">
+
+                ON
+
+            </button>
+
+            <button
+                class="btn-off"
+                onclick="sendCommand('BEACON_OFF')">
+
+                OFF
+
+            </button>
+
+        </div>
+
+
+        <!-- SYSTEM -->
+
+        <div class="card">
+
+            <h3>⚙️ SYSTEM CONTROL</h3>
+
+            <div class="device-status">
+
+                MASTER CONTROL
+
+            </div>
+
+            <button
+                class="btn-all"
+                onclick="sendCommand('ALL_ON')">
+
+                ALL ON
+
+            </button>
+
+            <button
+                class="btn-off"
+                onclick="sendCommand('ALL_OFF')">
+
+                ALL OFF
+
+            </button>
+
+        </div>
+
+
+    </div>
+
+
+    <!-- EMERGENCY -->
+
+    <div class="emergency">
+
+        <h2>🚨 EMERGENCY ALARM</h2>
+
+        <div id="emergencyStatus"
+             class="device-status">
+
+            SYSTEM NORMAL
+
+        </div>
+
+        <button
+            class="btn-emergency"
+            onclick="sendCommand('EMERGENCY_ON')">
+
+            🚨 ACTIVATE EMERGENCY
+
+        </button>
+
+        <br>
+
+        <button
+            class="btn-all"
+            onclick="sendCommand('EMERGENCY_OFF')">
+
+            RESET EMERGENCY
+
+        </button>
+
+    </div>
+
+
+</div>
+
+
+<footer>
+
+    Airport Runway Control System<br>
+
+    ESP32 + MQTT + Wokwi
+
+</footer>
+
+
+<script>
+
+
+// =====================================================
+// MQTT CONFIGURATION
+// =====================================================
+
+const MQTT_URL =
+    "wss://broker.hivemq.com:8884/mqtt";
+
+
+const CONTROL_TOPIC =
+    "poltekbang/sim/runway/control_2026a7";
+
+
+const STATUS_TOPIC =
+    "poltekbang/sim/runway/status_2026a7";
+
+
+// =====================================================
+// CONNECT
+// =====================================================
+
+const client = mqtt.connect(MQTT_URL);
+
+
+// =====================================================
+// CONNECTED
+// =====================================================
+
+client.on("connect", function() {
+
+    console.log("MQTT connected");
+
+    const status =
+        document.getElementById(
+            "connectionStatus"
+        );
+
+    status.innerText = "TERHUBUNG";
+
+    status.className =
+        "status-online";
+
+    client.subscribe(STATUS_TOPIC);
+
+});
+
+
+// =====================================================
+// ERROR
+// =====================================================
+
+client.on("error", function(error) {
+
+    console.log("MQTT ERROR:", error);
+
+    const status =
+        document.getElementById(
+            "connectionStatus"
+        );
+
+    status.innerText = "ERROR";
+
+    status.className =
+        "status-offline";
+
+});
+
+
+// =====================================================
+// SEND COMMAND
+// =====================================================
+
+function sendCommand(command) {
+
+    if (!client.connected) {
+
+        alert(
+            "MQTT belum terhubung!"
+        );
+
+        return;
+    }
+
+    console.log(
+        "Sending:",
+        command
+    );
+
+    client.publish(
+        CONTROL_TOPIC,
+        command
+    );
+
+}
+
+
+// =====================================================
+// RECEIVE STATUS
+// =====================================================
+
+client.on(
+    "message",
+    function(topic, message) {
+
+        if (topic !== STATUS_TOPIC) {
+
+            return;
+        }
+
+        try {
+
+            const data =
+                JSON.parse(
+                    message.toString()
+                );
+
+
+            console.log(
+                "ESP32 STATUS:",
+                data
+            );
+
+
+            // -----------------------------------------
+            // RUNWAY
+            // -----------------------------------------
+
+            updateStatus(
+                "runwayStatus",
+                data.runway1 &&
+                data.runway2 &&
+                data.runway3 &&
+                data.runway4,
+                "ON",
+                "OFF"
+            );
+
+
+            // Visual runway
+
+            updateVisual(
+                "visual1",
+                data.runway1
+            );
+
+            updateVisual(
+                "visual2",
+                data.runway2
+            );
+
+            updateVisual(
+                "visual3",
+                data.runway3
+            );
+
+            updateVisual(
+                "visual4",
+                data.runway4
+            );
+
+
+            // -----------------------------------------
+            // APPROACH
+            // -----------------------------------------
+
+            updateStatus(
+                "approachStatus",
+                data.approach,
+                "ON",
+                "OFF"
+            );
+
+
+            // -----------------------------------------
+            // BEACON
+            // -----------------------------------------
+
+            updateStatus(
+                "beaconStatus",
+                data.beacon,
+                "ACTIVE",
+                "OFF"
+            );
+
+
+            // -----------------------------------------
+            // EMERGENCY
+            // -----------------------------------------
+
+            const emergency =
+                document.getElementById(
+                    "emergencyStatus"
+                );
+
+
+            if (data.emergency) {
+
+                emergency.innerText =
+                    "🚨 EMERGENCY ACTIVE";
+
+                emergency.className =
+                    "device-status danger";
+
+            }
+
+            else {
+
+                emergency.innerText =
+                    "SYSTEM NORMAL";
+
+                emergency.className =
+                    "device-status";
+
+            }
+
+        }
+
+        catch(error) {
+
+            console.log(
+                "JSON ERROR:",
+                error
+            );
+
+        }
+
+    }
+);
+
+
+// =====================================================
+// UPDATE STATUS
+// =====================================================
+
+function updateStatus(
+    elementID,
+    state,
+    onText,
+    offText
+) {
+
+    const element =
+        document.getElementById(
+            elementID
+        );
+
+
+    if (state) {
+
+        element.innerText =
+            onText;
+
+        element.className =
+            "device-status active";
+
+    }
+
+    else {
+
+        element.innerText =
+            offText;
+
+        element.className =
+            "device-status";
+
+    }
+
+}
+
+
+// =====================================================
+// UPDATE RUNWAY VISUAL
+// =====================================================
+
+function updateVisual(
+    elementID,
+    state
+) {
+
+    const element =
+        document.getElementById(
+            elementID
+        );
+
+
+    if (state) {
+
+        element.classList.add(
+            "on"
+        );
+
+    }
+
+    else {
+
+        element.classList.remove(
+            "on"
+        );
+
+    }
+
+}
+
+
+</script>
+
+
+</body>
+
+</html>
